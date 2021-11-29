@@ -9,6 +9,11 @@ executors:
     github-publisher:
         docker:
             - image: cimg/go:1.13
+    master-checker:
+        environment:
+            IMAGE_NAME: iohubos/iohubos-mqtt
+        docker:
+            - image: cimg/base:stable-20.04
 
 jobs:
     build:
@@ -68,6 +73,11 @@ jobs:
                       go get github.com/tcnksm/ghr
                       ghr -t ${GITHUB_TOKEN} ${CIRCLE_TAG} /tmp/workspace/dist
 
+    build-master:
+        executor: master-checker
+        steps:
+            - run: echo "Success"
+
 workflows:
     version: 2
     build-tags:
@@ -90,3 +100,9 @@ workflows:
                           only: /^v.*/
                       branches:
                           ignore: /.*/
+    build-master:
+        jobs:
+            - build-master:
+                  filters:
+                      branches:
+                          only: master
