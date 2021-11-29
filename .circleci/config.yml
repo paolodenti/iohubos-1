@@ -3,9 +3,12 @@ version: 2.1
 executors:
     machine-publisher:
         environment:
-            IMAGE_NAME: iohubos/iohubos-builder
+            IMAGE_NAME: paolodenti/iohubos-builder
         machine:
             image: ubuntu-2004:202111-01
+    github-publisher:
+        docker:
+            - image: cimg/go:1.13
 
 jobs:
     build:
@@ -42,6 +45,28 @@ jobs:
                       docker tag $IMAGE_NAME:latest $IMAGE_NAME:$IMAGE_TAG
                       docker push $IMAGE_NAME:latest
                       docker push $IMAGE_NAME:$IMAGE_TAG
+            - run:
+                  name: Build Installer and Firmware
+                  command: |
+                      mkdir dist
+                      docker run -it --privileged --rm -v ${PWD}/dist:/dist ${IMAGE_NAME}
+            - persist_to_workspace:
+                  root: ./dist
+                  paths:
+                      - ./firmware.tgz
+                      - ./installer.img
+    publish-tag:
+        executor: github-publisher
+        steps:
+            - attach_workspace:
+                  at: /tmp/workspace
+            - checkout
+            - setup_remote_docker
+            - run:
+                  name: Publish to GitHub Release ${CIRCLE_TAG}
+                  command: |
+                      go get github.com/tcnksm/ghr
+                      ghr -t ${GITHUB_TOKEN} ${CIRCLE_TAG} /tmp/workspace/dist
 
 workflows:
     version: 2
@@ -50,6 +75,16 @@ workflows:
             - build:
                   context:
                       - dockerhub-iohubos
+                  filters:
+                      tags:
+                          only: /^v.*/
+                      branches:
+                          ignore: /.*/
+            - publish-tag:
+                  context:
+                      - github-iohubos
+                  requires:
+                      - build
                   filters:
                       tags:
                           only: /^v.*/
